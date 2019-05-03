@@ -114,32 +114,33 @@ void IsrWord::SetLocations (Vector<Location>& matchesIn)
    matches = matchesIn;
 }
 
-Location IsrWord::SeekToLocation(Location location)
+Location IsrWord::SeekToLocation(Location locationToSeek)
 {
-   Location closestLocation = IsrGlobals::IsrSentinel;
-   curInd = 0;
-   if(matches.size() > 0)
-   {
-      closestLocation = matches[0];
-   }
-   
-   while(curInd < matches.size() - 1 && matches[curInd] < closestLocation)
-   {
-      ++curInd;
-      closestLocation = matches[curInd];
-   }
-   
-   if(curInd == matches.size() - 1)
-   {
-      if(matches[curInd] > location)
+   if(matches.empty())
       {
-         closestLocation = matches[curInd];
+      currentLocation = IsrGlobals::IsrSentinel;
+      curInd = 0;
+      return currentLocation;
       }
-      else
-         closestLocation = IsrGlobals::IsrSentinel;
+
+   currentLocation = IsrGlobals::IsrSentinel;
+   curInd = 0;
+   do
+      {
+      currentLocation = matches[curInd++];
+      }
+   while(curInd < matches.size() && currentLocation < locationToSeek);
+
+   if(currentLocation < locationToSeek)
+   {
+      currentLocation = IsrGlobals::IsrSentinel;
+      curInd = 0;
    }
-   currentLocation = closestLocation;
-   return closestLocation;
+
+   if(curInd != 0) //prevent overflow, although shouldn't matter if it does
+      curInd--;
+
+   return currentLocation;
 }
 
 bool IsrWord::hasNextInstance()
