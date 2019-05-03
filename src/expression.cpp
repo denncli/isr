@@ -106,6 +106,7 @@ Location IsrWord::ResetToStart()
        return IsrGlobals::IsrSentinel;
        }
     currentLocation = matches[0];
+    printf("%d", currentLocation);
     return matches[0];
 }
 
@@ -116,30 +117,15 @@ void IsrWord::SetLocations (Vector<Location>& matchesIn)
 
 Location IsrWord::SeekToLocation(Location location)
 {
+   if(matches.empty())
+      return IsrGlobals::IsrSentinel;
    Location closestLocation = IsrGlobals::IsrSentinel;
    curInd = 0;
-   if(matches.size() > 0)
-   {
-      closestLocation = matches[0];
-   }
-   
-   while(curInd < matches.size() - 1 && matches[curInd] < closestLocation)
-   {
-      ++curInd;
-      closestLocation = matches[curInd];
-   }
-   
-   if(curInd == matches.size() - 1)
-   {
-      if(matches[curInd] > location)
-      {
-         closestLocation = matches[curInd];
-      }
-      else
-         closestLocation = IsrGlobals::IsrSentinel;
-   }
-   currentLocation = closestLocation;
-   return closestLocation;
+
+   while(curInd < matches.size() && matches[curInd] < location)
+      curInd++;
+
+   return matches[curInd];
 }
 
 bool IsrWord::hasNextInstance()
@@ -169,7 +155,12 @@ void IsrEndDoc::saveDocInfo() {
 }
 
 IsrEndDoc::IsrEndDoc()
-    : currentLocation(IsrGlobals::IsrSentinel) {}
+    : currentLocation(IsrGlobals::IsrSentinel), docInfo(nullptr) {
+    matches.push_back(10);
+    matches.push_back(20);
+    matches.push_back(30);
+    matches.push_back(40);
+    }
 
 IsrEndDoc::~IsrEndDoc() {
     delete docInfo;
@@ -274,14 +265,26 @@ Location Isr::MoveAllTermsOffCurrentDocument() {
     return terms[0]->GetCurrentLocation();
 }
 
-Location IsrOr::NextInstance() {
-    if(GetCurrentLocation() == IsrGlobals::IsrSentinel) {
-        currentLocation = IsrGlobals::IsrSentinel;
-        return currentLocation;
+Location::IsrOr::NextInstanceWithoutSeekToNewPage() {
+    if(GetCurrentLocation() == IsrGlobals::IsrSentinel
+            || terms.empty())
+        return GetCurrentLocation();
+
+    Isr* minIsr = terms[0];
+    for(size_t i = 1; i < terms.size(); ++i) {
+        if(terms[i]->GetCurrentLocation() < minIsr->GetCurrentLocation())
+            minIsr = terms[i];
     }
-    if(GetCurrentLocation() == IsrGlobals::IsrSentinel) {
-        currentLocation = IsrGlobals::IsrSentinel;
-        return currentLocation;
+    
+    currentLocation = minIsr->GetCurrentLocation();
+    return currentLocation;
+}
+
+Location IsrOr::NextInstance() {
+    Location nextLocation = MoveAllTermsOffCurrentDocument();
+    if(nextLocation == IsrGlobals::IsrSentinel) {
+       currentLocation = IsrGlobals::IsrSentinel;
+       return currentLocation;
     }
     //else return isr with min location
     Isr* minIsr = terms[0];
@@ -343,8 +346,44 @@ Location IsrAnd::moveTermsToSameDocument(DocumentLocation& docLocation) {
       terms[i]->SeekToLocation(docLocation.docStart);
 }
 
+Location IsrAnd::NextInstanceWithoutSeekToNewPage() {
+    if(GetCurrentLocation() == IsrGlobals::IsrSentinel
+            || terms.empty())
+        return GetCurrentLocation();
+
+   Isr* maxLocationIsr = terms[0];
+   bool allIsrsOnSameDoc = false;
+   while(!allIsrsOnSameDoc) {
+      allIsrsOnSameDoc = true;
+      //find max location isr
+      for(size_t i = 0; i < terms.size(); ++i) {
+         if(terms[i]->GetCurrentLocation() == IsrGlobals::IsrSentinel) {
+            currentLocation = IsrGlobals::IsrSentinel;
+            return currentLocation;
+         }
+         if(terms[i]->GetCurrentLocation() > maxLocationIsr->GetCurrentLocation())
+            maxLocationIsr = terms[i];
+      }
+      //attempt to move all isrs to same document as maxLocIsr
+      IsrEndDoc* endDocIsr = new IsrEndDoc;
+      MoveDocEndToCurrentDocument(endDocIsr, this);
+      DocumentLocation docLocation = GetDocumentLocation(endDocIsr);
+      delete endDocIsr;
+
+      for(size_t i = 0; i < terms.size(); ++i) {
+         if(!IsOnDoc(docLocation, terms[i])) {
+            allIsrsOnSameDoc = false;
+            terms[i]->SeekToLocation(docLocation.docStart);
+         }
+      }
+    }
+   currentLocation = terms[0]->GetCurrentLocation();
+   return currentLocation;
+}
+
 Location IsrAnd::NextInstance() {
-   if(GetCurrentLocation() == IsrGlobals::IsrSentinel) {
+   Location nextLocation = MoveAllTermsOffCurrentDocument();
+   if(nextLocation == IsrGlobals::IsrSentinel) {
       currentLocation = IsrGlobals::IsrSentinel;
       return currentLocation;
    }
@@ -366,6 +405,7 @@ Location IsrAnd::NextInstance() {
       IsrEndDoc* endDocIsr = new IsrEndDoc;
       MoveDocEndToCurrentDocument(endDocIsr, this);
       DocumentLocation docLocation = GetDocumentLocation(endDocIsr);
+      delete endDocIsr;
 
       for(size_t i = 0; i < terms.size(); ++i) {
          if(!IsOnDoc(docLocation, terms[i])) {
@@ -389,11 +429,63 @@ Location IsrAnd::ResetToStart() {
    }
 
    currentLocation = IsrGlobals::IndexStart;
-   return NextInstance();
+   return NextInstanceWithoutSeekToNewPage();
 }
 
+Location IsrPhrase::NextInstanceWithoutSeekToNewPage() {
+    if(GetCurrentLocation() == IsrGlobals::IsrSentinel
+            || terms.empty())
+        return GetCurrentLocation();
+    
+   Isr* maxLocationIsr = terms[0];
+   size_t maxLocationIsrInd = 0;
+   bool hasExactMatch = false;
+   while(!hasExactMatch) {
+      hasExactMatch = true;
+      //find max location isr
+      for(size_t i = 0; i < terms.size(); ++i) {
+         if(terms[i]->GetCurrentLocation() == IsrGlobals::IsrSentinel) {
+            currentLocation = IsrGlobals::IsrSentinel;
+            return currentLocation;
+         }
+         if(terms[i]->GetCurrentLocation() > maxLocationIsr->GetCurrentLocation()) {
+            maxLocationIsr = terms[i];
+            maxLocationIsrInd = i;
+         }
+      }
+      //attempt to move to correct position
+      for(size_t i = 0; i < terms.size(); ++i) {
+          //check
+         if(terms[i]->GetCurrentLocation() == IsrGlobals::IsrSentinel) {
+            currentLocation = IsrGlobals::IsrSentinel;
+            return currentLocation;
+         }
+         
+         int correctOffset = i - maxLocationIsr->GetCurrentLocation();
+         Location correctLocation = 
+               maxLocationIsr->GetCurrentLocation() + correctOffset;
+         terms[i]->SeekToLocation(correctLocation);
+         //check
+         if(terms[i]->GetCurrentLocation() == IsrGlobals::IsrSentinel) {
+            currentLocation = IsrGlobals::IsrSentinel;
+            return currentLocation;
+         }
+
+         if(terms[i]->GetCurrentLocation() != correctLocation) {
+            hasExactMatch = false;
+            break;
+         }
+      }
+   }
+
+   currentLocation = terms[0]->GetCurrentLocation();
+   return currentLocation;
+}
+
+
 Location IsrPhrase::NextInstance() {
-   if(GetCurrentLocation() == IsrGlobals::IsrSentinel) {
+   Location nextLocation = MoveAllTermsOffCurrentDocument();
+   if(nextLocation == IsrGlobals::IsrSentinel) {
       currentLocation = IsrGlobals::IsrSentinel;
       return currentLocation;
    }
@@ -453,5 +545,5 @@ Location IsrPhrase::ResetToStart() {
    }
 
    currentLocation = IsrGlobals::IndexStart;
-   return NextInstance();
+   return NextInstanceWithoutSeekToNewPage();
 }

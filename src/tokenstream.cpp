@@ -140,7 +140,7 @@ Isr *TokenStream::parseWord( )
    {
       location++;//get rid of whitespace
    }
-   String strval = String( val );
+   String strval = String( val.c_str() );
    return new IsrWord(strval);
 }
 
