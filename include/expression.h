@@ -66,7 +66,7 @@ public:
    void SetLocations( Vector<Location>& matchesIn );
    //    ~IsrWord( );
    
-   Location NextInstance( )override;
+   Location NextInstance( ) override;
    Location SeekToLocation( Location seekDestination = 0 ) override;
    Location GetCurrentLocation() override;
    Location ResetToStart() override;
