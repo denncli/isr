@@ -1,6 +1,9 @@
+// Created by Jason Setting
+// Graham Eger added additional string concatenation functions on 4/2
+
 #include <cstring>
 #include <cctype>
-#include "String.hpp"
+#include "String.h"
 
 const char* String::nullString = "";
 
@@ -14,20 +17,15 @@ String::String( const char single_char ) : size( 1 )
     cstring[1] = 0;
 }
 
-String::String( const char* toCopy ) : size( (int)strlen( toCopy ) )
+String::String( const char* toCopy ) : size( strlen( toCopy ) )
 {
     cstring = new char[ size + 1 ];
     strcpy( cstring, toCopy );
 }
 
-String::String( const std::string toCopy ) : size( (int)toCopy.length() )
-{
-    cstring = new char[ size + 1 ];
-    strcpy( cstring, toCopy.c_str() );
-}
 
 String::String( char*&& toMove ) : cstring( toMove ),
-size( (int)strlen( toMove ) )
+size( strlen( toMove ) )
 {
     toMove = nullptr;
 }
@@ -72,10 +70,10 @@ String& String::operator = ( String&& toMove )
 
 
 String::~String( )
-{
-    delete[ ] cstring;
-    cstring = nullptr;
-}
+   {
+   delete[] cstring;
+   cstring = nullptr;
+   }
 
 
 void String::Swap( String& toSwap )
@@ -133,38 +131,51 @@ char& String::operator[ ] ( int index )
 
 
 String& String::operator+= ( const String& rhs )
-{
-    if ( rhs.cstring == nullptr )
-        return *this;
-    
-    int newSize = size + rhs.size;
-    char* newCString = new char[newSize + 1];
-    
-    if ( cstring != nullptr )
-        strcpy( newCString, cstring );
-    strcpy( newCString + size, rhs.cstring );
-    
-    delete cstring;
-    cstring = newCString;
-    size = newSize;
-    
-    return *this;
-}
+   {
+   if ( rhs.cstring == nullptr )
+      return *this;
+
+   int newSize = size + rhs.size;
+   char* newCString = new char[newSize + 1];
+
+   if ( cstring != nullptr )
+      strcpy( newCString, cstring );
+   strcpy( newCString + size, rhs.cstring );
+
+   delete[] cstring;
+   cstring = newCString;
+   size = newSize;
+
+   return *this;
+   }
+ 
+ String operator+( String lhs, const String& rhs) 
+   {
+   lhs += rhs;
+   return lhs;
+   }
 
 String::operator bool( ) const
-{
-    return size > 0;
-}
+   {
+   return size > 0;
+   }
 
-void String::RemoveWhitespace()
-{
-    char* i = cstring;
-    char* j = cstring;
-    while(*j != 0)
-    {
-        *i = *j++;
-        if(!isspace(*i))
-            i++;
-    }
-    *i = 0;
+void String::RemoveWhitespace() 
+  {
+  char* i = cstring;
+  char* j = cstring;
+  while(*j != 0)
+  {
+    *i = *j++;
+    if(!isspace(*i))
+      i++;
+  }
+  *i = 0;
+  }
+
+String operator+ (String lhs, const char * toCat) 
+   {
+   auto cat = String(toCat);
+   lhs += cat;
+   return lhs;
 }

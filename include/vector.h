@@ -1,28 +1,33 @@
 // Graham Eger added a resize() function that takes an argument on 04/08/2019
-// Jacob changed original numAllocated from 400 to 1 on 04/20/2019
+// Dennis Li added all variations of insert function on 4/18/19
 
 #pragma once
+#ifndef VECTOR_H
+#define VECTOR_H
+
 #include <algorithm>
 template<class T>
 class Vector {
     //OVERVIEW: A container that provides random access to
     //          any element by its index.  Indices start at 0.
+    //          The capacity (maximum size) of an IntVector is
+    //          100 elements.
     
 private:
     
     T *elements; //pointer to dynamic array
     size_t numElements = 0;  //Current capacity
-    size_t numAllocated = 1; //capacity of array
+    size_t numAllocated = 400; //capacity of array
     
 public:
     
     Vector();
-    
+
+    //EFFECTS: Constructor
+    Vector( std::initializer_list< T > in_list ); 
+
     //EFFECTS: Constructor
     Vector(size_t num);
-    
-    //EFFECTS: Constructor
-    Vector( std::initializer_list< T > in_list );
     
     //Custom Destructor;
     ~Vector();
@@ -47,11 +52,33 @@ public:
     //MODIFIES: this IntVector
     //EFFECTS:  Removes the last element in this IntVector.
     void pop_back();
-    
+
+    //MODIFIES: this Vector
+    //EFFECTS:  Inserts value into position before index ind
+    void insert(T value, size_t ind);
+
+    //MODIFIES: this Vector
+    //EFFECTS:  Inserts value into position before index ind. 
+    //size stays fixed so last element gets popped after insertion
+    void insert_fixed_size(T value, size_t ind);
+
+    //REQUIRES: Vector must be sorted!
+    //EFFECTS: Insert element into vector in sorted order
+    //Maintains original size, so largest element will be popped!
+    template <typename Compare>
+    void insertSorted(T value, Compare comparator);
+
+    //REQUIRES: Vector must be sorted!
+    //EFFECTS: Insert element into vector in sorted order
+    //Will maintain max size of maxSize, so if current size
+    //is maxSize the largest element will be popped!
+    template <typename Compare>
+    void insertSortedMaxSize(T value, Compare comparator, size_t maxSize);
+
     //REQUIRES: 0 <= index < number of elements in this IntVector
     //EFFECTS:  Returns (by reference) the element at the given index.
     T &at(size_t index);
-    
+
     const T& back();
     
     //REQUIRES: 0 <= index < number of elements in this IntVector
@@ -61,6 +88,8 @@ public:
     //REQUIRES: 0 <= index < number of elements in this IntVector
     //EFFECTS:  Returns (by reference) the element at the given index.
     T& operator[](size_t index);
+
+    T& operator[](size_t index) const;
     
     //EFFECTS:  Returns the number of elements of this IntVector.
     size_t size() const;
@@ -71,6 +100,7 @@ public:
     bool empty() const;
     
     //EFFECTS:  Returns true if this Vector is at capacity, false otherwise.
+    //          That is, you may add elements if and only if full() is false.
     bool full() const;
 };
 
@@ -80,18 +110,18 @@ Vector<T>::Vector() {
     elements = new T[numAllocated];
 }
 
+template< class T >
+Vector< T >::Vector( std::initializer_list< T > in_list )
+      : elements( new T[ in_list.size( ) ] ), numAllocated( in_list.size( ) )
+   {
+   for ( auto iterator = in_list.begin( ); iterator != in_list.end( ); iterator++ )
+      push_back( *iterator );
+   }
+
 template<class T>
 Vector<T>::Vector(size_t capacity) {
     numAllocated = capacity;
     elements = new T[numAllocated];
-}
-
-template< class T >
-Vector< T >::Vector( std::initializer_list< T > in_list )
-: elements( new T[ in_list.size( ) ] ), numAllocated( in_list.size( ) )
-{
-    for ( auto iterator = in_list.begin( ); iterator != in_list.end( ); iterator++ )
-        push_back( *iterator );
 }
 
 //copy constructor
@@ -133,7 +163,6 @@ Vector<T>::~Vector() {
     delete[] elements;
 }
 
-//REQUIRES: this Vector is not full
 //MODIFIES: this Vector
 //EFFECTS:  Adds value to the end of this IntVector.
 template<class T>
@@ -148,14 +177,21 @@ void Vector<T>::push_back(T value){
 //REQUIRES: 0 <= index < number of elements in this IntVector
 //EFFECTS:  Returns (by reference) the element at the given index.
 template<class T>
-const T& Vector<T>::at(size_t index) const {
+const T &Vector<T>::at(size_t index) const {
     return elements[index];
 }
 
 //REQUIRES: 0 <= index < number of elements in this IntVector
 //EFFECTS:  Returns (by reference) the element at the given index.
-template<class T>
-T& Vector<T>::operator[] (size_t index) {
+template<class t>
+t& Vector<t>::operator[] (size_t index) {
+    return elements[index];
+}
+
+//REQUIRES: 0 <= index < number of elements in this IntVector
+//EFFECTS:  Returns (by reference) the element at the given index.
+template<class t>
+t& Vector<t>::operator[] (size_t index) const {
     return elements[index];
 }
 
@@ -184,6 +220,7 @@ bool Vector<T>::empty() const {
 }
 
 //EFFECTS:  Returns true if this IntVector is at capacity, false otherwise.
+//          That is, you may add elements if and only if full() is false.
 template<class T>
 bool Vector<T>::full() const {
     return (numElements >= numAllocated);
@@ -201,8 +238,76 @@ void Vector<T>::resize() {
     delete [] tmp_array;
 }
 
+//MODIFIES: this Vector
+//EFFECTS:  Inserts value into position before index ind
+template<class T>
+void Vector<T>::insert(T value, size_t ind) {
+    if(full()) {
+        resize();
+    }
+
+    for(size_t i = ind; i < numElements; ++i) {
+        T displacedElement = elements[i];
+        elements[i] = value;
+        value = displacedElement;
+    }
+
+    elements[numElements] = value;
+    numElements++;
+}
+
+//MODIFIES: this Vector
+//EFFECTS:  Inserts value into position before index ind. 
+//size stays fixed so last element gets popped after insertion
+template<class T>
+void Vector<T>::insert_fixed_size(T value, size_t ind) {
+    for(size_t i = ind; i < numElements; ++i) {
+        T displacedElement = elements[i];
+        elements[i] = value;
+        value = displacedElement;
+    }
+}
+
+
+//REQUIRES: Vector must be sorted!
+//EFFECTS: Insert element into vector in sorted order
+//Maintains original size, so largest element will be popped!
+template<class T>
+template<class Compare>
+void Vector<T>::insertSorted(T value, Compare comparator) {
+    for(size_t i = 0; i < numElements; ++i) {
+        if(comparator(value, elements[i])) {
+            insert_fixed_size(value, i);
+            break;
+        }
+    }
+}
 
 template<class T>
-void Vector<T>::pop_back(){
-    numElements--;
+void Vector<T>::pop_back() {
+   numElements--;
 }
+
+//REQUIRES: Vector must be sorted!
+//EFFECTS: Insert element into vector in sorted order
+//Will maintain max size of maxSize, so if current size
+//is maxSize the largest element will be popped!
+template<class T>
+template<class Compare>
+void Vector<T>::insertSortedMaxSize(T value, Compare comparator, size_t maxSize) {
+    bool insertedElement = false;
+    for(size_t i = 0; i < numElements && !insertedElement; ++i) {
+        if(comparator(value, elements[i])) {
+            insert(value, i);
+            insertedElement = true;
+        }
+    }
+
+    if(!insertedElement)
+       push_back(value);
+
+    if(numElements > maxSize)
+       pop_back();
+}
+
+#endif
